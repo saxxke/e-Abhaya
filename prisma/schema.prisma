@@ -1,0 +1,77 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  CITIZEN
+  OFFICER
+  ADMIN
+}
+
+enum ComplaintStatus {
+  PENDING
+  REVIEWING
+  FIR_REGISTERED
+  RESOLVED
+}
+
+model User {
+  id                 String           @id @default(uuid())
+  name               String
+  email              String           @unique
+  passwordHash       String
+  role               Role             @default(CITIZEN)
+  createdAt          DateTime         @default(now())
+  
+  // Relations
+  submittedComplaints Complaint[]     @relation("SubmittedComplaints")
+  assignedComplaints  Complaint[]     @relation("AssignedComplaints")
+  auditLogs           AuditLog[]
+}
+
+model Complaint {
+  id                 String           @id @default(uuid())
+  trackingId         String           @unique
+  title              String
+  description        String
+  category           String           // e.g. THEFT, CYBER, ASSAULT
+  status             ComplaintStatus  @default(PENDING)
+  aiSummary          String?          @db.Text
+  aiPriorityScore    Int              @default(0) // 1-100
+  legalSections      String[]         // Array of suggested penal code clauses (BNS/IPC)
+  location           String
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  
+  // Relations
+  submittedBy        User             @relation("SubmittedComplaints", fields: [submittedById], references: [id])
+  submittedById      String
+  
+  assignedOfficer    User?            @relation("AssignedComplaints", fields: [assignedOfficerId], references: [id])
+  assignedOfficerId  String?
+  
+  auditLogs          AuditLog[]
+}
+
+model EmergencyContact {
+  id                 String           @id @default(uuid())
+  agencyName         String
+  phoneNumber        String
+  category           String           // e.g. NATIONAL, CYBER, REGIONAL
+  locationScope      String
+}
+
+model AuditLog {
+  id                 String           @id @default(uuid())
+  action             String
+  complaintId        String
+  complaint          Complaint        @relation(fields: [complaintId], references: [id])
+  performedBy        User             @relation(fields: [performedById], references: [id])
+  performedById      String
+  timestamp          DateTime         @default(now())
+}
